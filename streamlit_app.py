@@ -46,6 +46,12 @@ def db_upload(df: pd.DataFrame, table_name: str):
     df.to_sql(table_name, engine, if_exists="append", index=False)
 
 
+def db_delete_table(table_name: str):
+    with engine.connect() as conn:
+        conn.execute(text(f"DROP TABLE IF EXISTS [{table_name}]"))
+        conn.commit()
+
+
 # ─────────────────────────────────────────────────────
 # Page Config
 # ─────────────────────────────────────────────────────
@@ -216,11 +222,29 @@ with st.sidebar:
         st.info("No datasets found. Upload a file above.")
         st.stop()
 
-    selected_table = st.radio(
-        "Choose a dataset",
-        tables,
-        label_visibility="collapsed",
-    )
+    # Initialize selected table
+    if "selected_table" not in st.session_state or st.session_state["selected_table"] not in tables:
+        st.session_state["selected_table"] = tables[0]
+
+    for tbl in tables:
+        col_name, col_del = st.columns([4, 1])
+        with col_name:
+            if st.button(
+                f"📊 {tbl}", key=f"select_{tbl}",
+                use_container_width=True,
+                type="primary" if st.session_state["selected_table"] == tbl else "secondary",
+            ):
+                st.session_state["selected_table"] = tbl
+                st.rerun()
+        with col_del:
+            if st.button("🗑️", key=f"delete_{tbl}", help=f"Delete {tbl}"):
+                db_delete_table(tbl)
+                if st.session_state.get("selected_table") == tbl:
+                    remaining = [t for t in tables if t != tbl]
+                    st.session_state["selected_table"] = remaining[0] if remaining else None
+                st.rerun()
+
+    selected_table = st.session_state["selected_table"]
 
 
 # ═════════════════════════════════════════════════════
