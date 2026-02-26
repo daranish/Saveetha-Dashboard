@@ -185,19 +185,27 @@ with st.sidebar:
         "Upload an Excel (.xlsx) file",
         type=["xlsx"],
         label_visibility="collapsed",
+        key="excel_uploader",
     )
 
     if uploaded_file is not None:
-        with st.spinner("⏳ Processing upload..."):
-            try:
-                import os
-                df_upload = process_student_excel(uploaded_file)
-                table_name = os.path.splitext(uploaded_file.name)[0].lower().replace(" ", "_")
-                db_upload(df_upload, table_name)
-                st.success(f"✅ Uploaded **{table_name}** — {len(df_upload)} rows")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Upload failed: {e}")
+        # Use session state to prevent re-uploading on every rerun
+        file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+        if st.session_state.get("last_uploaded") != file_id:
+            with st.spinner("⏳ Processing upload..."):
+                try:
+                    import os
+                    df_upload = process_student_excel(uploaded_file)
+                    table_name = os.path.splitext(uploaded_file.name)[0].lower().replace(" ", "_")
+                    db_upload(df_upload, table_name)
+                    st.session_state["last_uploaded"] = file_id
+                    st.session_state["upload_msg"] = f"✅ Uploaded **{table_name}** — {len(df_upload)} rows"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Upload failed: {e}")
+
+    if st.session_state.get("upload_msg"):
+        st.success(st.session_state.pop("upload_msg"))
 
     st.markdown("---")
     st.markdown("#### 📂 Datasets")
